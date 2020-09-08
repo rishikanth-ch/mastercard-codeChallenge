@@ -12,42 +12,72 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class CityService {
 
     @Autowired
     @Qualifier("Connections")
-    private Map<String, Set<String>> connections;
+    private volatile Map<String, Set<String>> connections;
 
-    @Autowired
-    CityConnections cityConnections;
+    volatile Set<String> pathTraversed = new HashSet<>();
+    volatile AtomicBoolean interruptProcess = new AtomicBoolean(false);
+
 
     public String areCitiesConnected(String origin, String destination) throws ExecutionException, InterruptedException {
-        final boolean areConnected;
+        boolean areConnected = false;
+        interruptProcess.set(false);
+        System.out.println(connections);
         if(connections.containsKey(origin) && connections.containsKey(destination)) {
-            System.out.println(cityConnections.pathTraversed);
-            final CompletableFuture<Boolean> originConnections = CompletableFuture.supplyAsync(() -> cityConnections.traverseConnections(origin,destination,null));
-            final CompletableFuture<Boolean> destConnections = CompletableFuture.supplyAsync(() -> cityConnections.traverseConnections(destination,origin,null));
-            if(originConnections.get()) {
-                System.out.println("Found destination...");
-                destConnections.cancel(true);
-                cityConnections.pathTraversed.clear();
-                return "yes";
-            }
-            if(destConnections.get()) {
-                System.out.println("Found origin...");
-                originConnections.cancel(true);
-                cityConnections.pathTraversed.clear();
-                return "yes";
+            if(connections.get(origin).contains(destination) || connections.get(destination).contains(origin)){
+                areConnected = true;
+            }else {
+                System.out.println(pathTraversed);
+
+                final CompletableFuture<Boolean> originConnections = CompletableFuture.supplyAsync(() -> traverseConnections(origin, destination, null,connections));
+                final CompletableFuture<Boolean> destConnections = CompletableFuture.supplyAsync(() -> traverseConnections(destination, origin, null,connections));
+                if (originConnections.get()) {
+                    System.out.println("Found destination...");
+                    destConnections.cancel(true);
+                    pathTraversed.clear();
+                    areConnected = areConnected || true;
+                }
+                if (destConnections.get()) {
+                    System.out.println("Found origin...");
+                    originConnections.cancel(true);
+                    areConnected = areConnected || true;
+                }
             }
         }
-        cityConnections.pathTraversed.clear();
-        return "no";
+        System.out.println(connections);
+        pathTraversed.clear();
+        return areConnected?"yes":"no";
     }
 
-    private void traversePath(String origin){
-
+    public boolean traverseConnections(String origin, String destination, String city, Map<String, Set<String>> connections){
+        if(interruptProcess.get()){
+            System.out.println("Processing stopped for "+origin);
+            return false;
+        }
+        String currentCity = city==null?origin:city;
+        System.out.println("Started looking connections for "+currentCity);
+        for(String conn : connections.get(currentCity)){
+            //TODO:Dynamically update the connections with the traversed path
+//            if(!conn.equals(origin)) connections.get(origin).add(conn);
+            if(!conn.equals(origin) && (pathTraversed.contains(conn) || conn.equals(destination))){
+                System.out.println("Destination Found for "+origin);
+                interruptProcess.set(true);
+                return true;
+            }else{
+                pathTraversed.add(conn);
+                System.out.println(conn);
+                traverseConnections(origin,destination,conn,connections);
+            }
+        }
+        System.out.println(destination+" is not in path");
+        return false;
     }
+
 }
 
