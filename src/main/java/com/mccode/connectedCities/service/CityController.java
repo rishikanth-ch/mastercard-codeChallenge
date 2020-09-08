@@ -10,6 +10,14 @@ public class CityController {
     @Autowired
     CityService cityService;
 
+    /**
+     *
+     * @param origin
+     * @param destination
+     * @return
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
     @GetMapping("/connected")
     @ResponseBody
     public String connectedCities(@RequestParam("origin") String origin,

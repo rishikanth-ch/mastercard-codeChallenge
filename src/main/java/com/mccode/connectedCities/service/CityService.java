@@ -4,14 +4,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.PostConstruct;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
@@ -21,9 +18,18 @@ public class CityService {
     @Qualifier("Connections")
     private volatile Map<String, Set<String>> connections;
 
-    volatile Set<String> pathTraversed = new HashSet<>();
-    volatile AtomicBoolean interruptProcess = new AtomicBoolean(false);
+    volatile Set<String> pathTraversed = new HashSet<>(); //Collection to track the path or cities traversed
+    volatile AtomicBoolean interruptProcess = new AtomicBoolean(false); //Used to terminate threads once the connection is found
 
+    /**
+     * This method will try to find if there is a direct connection between 2 cities. If not found, then it will try to
+     * figure out if the connection exists with hops.(any common cities/roads)
+     * @param origin
+     * @param destination
+     * @return
+     * @throws ExecutionException
+     * @throws InterruptedException
+     */
 
     public String areCitiesConnected(String origin, String destination) throws ExecutionException, InterruptedException {
         boolean areConnected = false;
@@ -55,27 +61,32 @@ public class CityService {
         return areConnected?"yes":"no";
     }
 
+    /**
+     * This method will traverse the hops and tries to find if destination is in the path/hops or any common city between
+     * origin and destination.
+     * The traversed cities can be added to the connection list so that the connections are readily available for next request.
+     * @param origin
+     * @param destination
+     * @param city
+     * @param connections
+     * @return
+     */
     public boolean traverseConnections(String origin, String destination, String city, Map<String, Set<String>> connections){
         if(interruptProcess.get()){
-            System.out.println("Processing stopped for "+origin);
             return false;
         }
         String currentCity = city==null?origin:city;
-        System.out.println("Started looking connections for "+currentCity);
         for(String conn : connections.get(currentCity)){
             //TODO:Dynamically update the connections with the traversed path
 //            if(!conn.equals(origin)) connections.get(origin).add(conn);
             if(!conn.equals(origin) && (pathTraversed.contains(conn) || conn.equals(destination))){
-                System.out.println("Destination Found for "+origin);
                 interruptProcess.set(true);
                 return true;
             }else{
                 pathTraversed.add(conn);
-                System.out.println(conn);
                 traverseConnections(origin,destination,conn,connections);
             }
         }
-        System.out.println(destination+" is not in path");
         return false;
     }
 

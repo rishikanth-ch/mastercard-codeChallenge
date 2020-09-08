@@ -19,6 +19,11 @@ public class FileLoader {
     @Autowired
     ResourceLoader resourceLoader;
 
+    /**
+     * The connections file is loaded when app startup and connections map which maps direct connections to a city
+     * is created to serve the requests.
+     * @return
+     */
     @Bean(name="Connections")
     public Map<String, Set<String>> getMapping() {
         //This method will create a list of all the connections to a given node from the input file provided
@@ -42,6 +47,12 @@ public class FileLoader {
         return connections;
     }
 
+    /**
+     * This method will add a city to existing list of connections or create a new list if the city doesn't exist in map.
+     * @param connections
+     * @param origin
+     * @param destination
+     */
     private void getMapping(Map<String, Set<String>> connections, String origin, String destination) {
         Set<String> cityList;
         if(connections.containsKey(origin)){
