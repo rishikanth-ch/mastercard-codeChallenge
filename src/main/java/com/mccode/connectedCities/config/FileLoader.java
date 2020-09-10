@@ -43,7 +43,6 @@ public class FileLoader {
         } catch (IOException e) {
             System.out.println("Unable to load file.");
         }
-        System.out.println("Connections Loaded:"+connections.size());
         return connections;
     }
 

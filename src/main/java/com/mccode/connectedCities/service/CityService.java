@@ -34,29 +34,23 @@ public class CityService {
     public String areCitiesConnected(String origin, String destination) throws ExecutionException, InterruptedException {
         boolean areConnected = false;
         interruptProcess.set(false);
-        System.out.println(connections);
         if(connections.containsKey(origin) && connections.containsKey(destination)) {
             if(connections.get(origin).contains(destination) || connections.get(destination).contains(origin)){
                 areConnected = true;
             }else {
-                System.out.println(pathTraversed);
-
                 final CompletableFuture<Boolean> originConnections = CompletableFuture.supplyAsync(() -> traverseConnections(origin, destination, null,connections));
                 final CompletableFuture<Boolean> destConnections = CompletableFuture.supplyAsync(() -> traverseConnections(destination, origin, null,connections));
                 if (originConnections.get()) {
-                    System.out.println("Found destination...");
                     destConnections.cancel(true);
                     pathTraversed.clear();
                     areConnected = areConnected || true;
                 }
                 if (destConnections.get()) {
-                    System.out.println("Found origin...");
                     originConnections.cancel(true);
                     areConnected = areConnected || true;
                 }
             }
         }
-        System.out.println(connections);
         pathTraversed.clear();
         return areConnected?"yes":"no";
     }

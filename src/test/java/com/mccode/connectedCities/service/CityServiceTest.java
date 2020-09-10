@@ -1,5 +1,6 @@
 package com.mccode.connectedCities.service;
 
+import org.junit.Before;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.jndi.JndiAccessor;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -24,25 +26,30 @@ import static org.mockito.Mockito.when;
 @SpringBootTest
 class CityServiceTest {
 
-    private Map<String, Set<String>> connections;
-
     Set<String> pathTraversed = new HashSet<>();
     AtomicBoolean interruptProcess = new AtomicBoolean(false);
 
-    @MockBean
+    @Autowired
     CityService cityService;
 
-    @BeforeEach
-    void setUp() throws ExecutionException, InterruptedException {
-        connections = new HashMap<>();
-        connections.put("Boston",new HashSet<>(Arrays.asList("New York","Newark")));
-        connections.put("Albany",new HashSet<>(Arrays.asList("Trenton")));
-        connections.put("Philadelphia",new HashSet<>(Arrays.asList("Boston")));
+    @Autowired
+    @Qualifier("Connections")
+    private volatile Map<String, Set<String>> connections;
+
+    @Before
+    public void setUp() throws ExecutionException, InterruptedException {
+//        connections = new HashMap<>();
+//        connections.put("Boston",new HashSet<>(Arrays.asList("New York","Newark")));
+//        connections.put("Albany",new HashSet<>(Arrays.asList("Trenton")));
+//        connections.put("Philadelphia",new HashSet<>(Arrays.asList("Boston")));
         when(cityService.traverseConnections("Philadelphia","Newark",null,connections)).thenReturn(true);
-        when(cityService.areCitiesConnected("Boston","Newark")).thenReturn("yes");
-        when(cityService.areCitiesConnected("Albany","Trenton")).thenReturn("yes");
-        when(cityService.areCitiesConnected("Albany","Boston")).thenReturn("no");
-        when(cityService.areCitiesConnected("Philadelphia","Newark")).thenReturn("yes");
+        when(cityService.traverseConnections("Newark","Philadelphia",null,connections)).thenReturn(true);
+        when(cityService.traverseConnections("Albany","Newark",null,connections)).thenReturn(false);
+        when(cityService.traverseConnections("Newark","Albany",null,connections)).thenReturn(false);
+//        when(cityService.areCitiesConnected("Boston","Newark")).thenReturn("yes");
+//        when(cityService.areCitiesConnected("Albany","Trenton")).thenReturn("yes");
+//        when(cityService.areCitiesConnected("Albany","Boston")).thenReturn("no");
+//        when(cityService.areCitiesConnected("Philadelphia","Newark")).thenReturn("yes");
      }
 
     @AfterEach
@@ -52,16 +59,59 @@ class CityServiceTest {
     }
 
     @Test
-    void areCitiesConnectedWithHops() throws ExecutionException, InterruptedException {
-        assertEquals("yes",cityService.areCitiesConnected("Philadelphia","Newark"));
-        assertEquals(true,cityService.traverseConnections("Philadelphia","Newark",null,connections));
+    void areCitiesConnectedWithHops_connected() throws ExecutionException, InterruptedException {
+        boolean areConnected = false;
+        String origin ="Boston", destination = "Newark";
+        if(connections.containsKey(origin) && connections.containsKey(destination)) {
+            if (connections.get(origin).contains(destination) || connections.get(destination).contains(origin)) {
+                areConnected = true;
+            } else {
+                final CompletableFuture<Boolean> originConnections = CompletableFuture.supplyAsync(() -> cityService.traverseConnections(origin, destination, null, connections));
+                final CompletableFuture<Boolean> destConnections = CompletableFuture.supplyAsync(() -> cityService.traverseConnections(destination, origin, null, connections));
+                assertTrue(originConnections.get());
+                assertTrue(destConnections.get());
+            }
+        }
+    }
+
+    @Test
+    void areCitiesConnectedWithHops_notConnected() throws ExecutionException, InterruptedException {
+        boolean areConnected = false;
+        String origin ="Albany", destination = "Newark";
+        if(connections.containsKey(origin) && connections.containsKey(destination)) {
+            if (connections.get(origin).contains(destination) || connections.get(destination).contains(origin)) {
+                areConnected = true;
+            } else {
+                final CompletableFuture<Boolean> originConnections = CompletableFuture.supplyAsync(() -> cityService.traverseConnections(origin, destination, null, connections));
+                final CompletableFuture<Boolean> destConnections = CompletableFuture.supplyAsync(() -> cityService.traverseConnections(destination, origin, null, connections));
+                assertFalse(originConnections.get());
+                assertFalse(destConnections.get());
+            }
+        }
     }
 
     @Test
     void areCitiesConnectedDirectly() throws ExecutionException, InterruptedException {
-        assertEquals("yes",cityService.areCitiesConnected("Boston","Newark"));
-        assertEquals("yes",cityService.areCitiesConnected("Albany","Trenton"));
-        assertEquals("no",cityService.areCitiesConnected("Albany","Boston"));
+        boolean areConnected = false;
+        String origin ="Boston", destination = "Newark";
+        if(connections.containsKey(origin) && connections.containsKey(destination)) {
+            if(connections.get(origin).contains(destination) || connections.get(destination).contains(origin)){
+                areConnected = true;
+            }
+        }
+        assertTrue(areConnected);
+    }
+
+    @Test
+    void areCitiesConnected_incorrectCities() throws ExecutionException, InterruptedException {
+        boolean areConnected = false;
+        String origin ="x", destination = "y";
+        if(connections.containsKey(origin) && connections.containsKey(destination)) {
+            if(connections.get(origin).contains(destination) || connections.get(destination).contains(origin)){
+                areConnected = true;
+            }
+        }
+        assertFalse(areConnected);
     }
 
 
